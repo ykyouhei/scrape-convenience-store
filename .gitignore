@@ -13,3 +13,7 @@
 
 # dep
 vendor/
+
+# lambda
+*.zip
+main

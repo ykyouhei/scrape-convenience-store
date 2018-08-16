@@ -1,37 +1,56 @@
-package main
+package scraper
 
 import (
-	"fmt"
+	"log"
 	"regexp"
 	"strconv"
-	"time"
 	"unicode/utf8"
 
 	"github.com/antchfx/htmlquery"
-	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/net/html"
 )
 
-const (
-	baseURL  = "http://www.sej.co.jp"
-	itemPath = "/i/products/thisweek/"
-)
+var areas = map[string]int{
+	"北海道":    0,
+	"東北":     1,
+	"関東":     2,
+	"甲信越・北陸": 3,
+	"東海":     4,
+	"近畿":     5,
+	"中国・四国":  6,
+	"九州":     7,
+}
 
 // SevenElevenItem セブンイレブンの商品データ
 type SevenElevenItem struct {
-	ID               string   `json:"id"`
-	Title            string   `json:"title"`
-	Text             string   `json:"text"`
-	ImageURL         string   `json:"imageURL"`
-	DetailURL        string   `json:"detailURL"`
-	TaxIncludedPrice int      `json:"taxIncludedPrice"`
-	TaxExcludedPrice int      `json:"taxExcludedPrice"`
-	LaunchDate       int64    `json:"launchDate"`
-	Areas            []string `json:"areas"`
+	ID               string `json:"id"`
+	Title            string `json:"title"`
+	Text             string `json:"text"`
+	ImageURL         string `json:"imageURL"`
+	DetailURL        string `json:"detailURL"`
+	TaxIncludedPrice int    `json:"taxIncludedPrice"`
+	TaxExcludedPrice int    `json:"taxExcludedPrice"`
+	LaunchDate       int64  `json:"launchDate"`
+	Areas            []int  `json:"areas"`
 }
 
-// ScrapeToSevenEleven セブンイレブンの商品ページをスクレイピングする
-func ScrapeToSevenEleven() {
+// SevenElevenScraper FamilyMartの商品データリスト
+type SevenElevenScraper struct {
+}
+
+// DatabasePath FirebaseRTDのパスを返す
+func (scraper SevenElevenScraper) DatabasePath() string {
+	return "seven_items/thisweek"
+}
+
+// Scrape FirebaseRTDに保存するJSONを返す
+func (scraper SevenElevenScraper) Scrape() map[string]interface{} {
+	log.Println("=============== [START] SevenElevenItems ==============")
+
+	const (
+		baseURL  = "http://www.sej.co.jp"
+		itemPath = "/i/products/thisweek/"
+	)
 
 	items := []SevenElevenItem{}
 	doc, _ := htmlquery.LoadURL(baseURL + itemPath)
@@ -40,8 +59,7 @@ func ScrapeToSevenEleven() {
 	itemListNodes := htmlquery.Find(doc, "//*[@id='main']/div[@class='subCategory']//ul[@class='itemList']")
 
 	for index, areaNode := range areasNodes {
-		area := htmlquery.InnerText(areaNode.FirstChild)
-		fmt.Printf("=============== %s ==============\n", area)
+		area := areas[htmlquery.InnerText(areaNode.FirstChild)]
 
 		htmlquery.FindEach(itemListNodes[index], "li[@class='item']", func(index int, itemNode *html.Node) {
 			imgNode := htmlquery.FindOne(itemNode, "div[@class='image']")
@@ -53,7 +71,7 @@ func ScrapeToSevenEleven() {
 			itemName := htmlquery.InnerText(htmlquery.FindOne(itemNameNode, "//a"))
 			detailURL := baseURL + htmlquery.SelectAttr(htmlquery.FindOne(itemNameNode, "//a"), "href")
 			id := extractItemID(detailURL)
-			launchTime := launchTime(htmlquery.InnerText(htmlquery.FindOne(itemPriceNode, "li[@class='launch']")))
+			launchTime := launchTime(htmlquery.InnerText(htmlquery.FindOne(itemPriceNode, "li[@class='launch']")), newJPSeparator())
 			taxExcluded, taxIncluded := extractPrices(htmlquery.InnerText(htmlquery.FindOne(itemPriceNode, "li[@class='price']")))
 			detailText := loadDetailText(detailURL)
 
@@ -66,33 +84,38 @@ func ScrapeToSevenEleven() {
 				taxIncluded,
 				taxExcluded,
 				launchTime,
-				[]string{area}}
+				[]int{area}}
 
 			items = update(items, item, area)
+
+			log.Printf("%s: %s\n", item.ID, itemName)
 		})
 	}
 
+	results := map[string]interface{}{}
+
+	for _, item := range items {
+		results[item.ID] = item
+	}
+
+	return results
 }
 
 // MARK: - Private
 
-func update(items []SevenElevenItem, item SevenElevenItem, area string) []SevenElevenItem {
+func update(items []SevenElevenItem, item SevenElevenItem, area int) []SevenElevenItem {
 	newItems := items
 
 	for index, oldItem := range items {
 		if oldItem.ID == item.ID {
 			item.Areas = append(oldItem.Areas, area)
 			newItems[index] = item
-			fmt.Print("========= updated: \n")
-			spew.Dump(item)
 
 			return newItems
 		}
 	}
 
-	item.Areas = []string{area}
-	fmt.Print("========= new: \n")
-	spew.Dump(item)
+	item.Areas = []int{area}
 
 	return append(newItems, item)
 }
@@ -101,19 +124,6 @@ func loadDetailText(detailURL string) string {
 	doc, _ := htmlquery.LoadURL(detailURL)
 	textNode := htmlquery.FindOne(doc, "//div[@class='text']")
 	return htmlquery.InnerText(textNode)
-}
-
-func launchTime(text string) (unix int64) {
-	r := regexp.MustCompile(`([0-9]+)年([0-9]+)月([0-9]+)日`)
-	days := r.FindAllStringSubmatch(text, -1)[0]
-
-	year, _ := strconv.Atoi(days[1])
-	month, _ := strconv.Atoi(days[2])
-	day, _ := strconv.Atoi(days[3])
-	jst, _ := time.LoadLocation("Asia/Tokyo")
-
-	unix = time.Date(year, time.Month(month), day, 0, 0, 0, 0, jst).Unix()
-	return
 }
 
 func extractItemID(detailURL string) (id string) {
