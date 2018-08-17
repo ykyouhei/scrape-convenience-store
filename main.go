@@ -23,7 +23,6 @@ func HandleRequest(ctx context.Context, name MyEvent) (string, error) {
 }
 
 func main() {
-	scrape(context.Background())
 	lambda.Start(HandleRequest)
 }
 
