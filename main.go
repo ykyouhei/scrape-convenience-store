@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"log"
 	"os"
 
 	firebase "firebase.google.com/go"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/ykyouhei/conveniencestore/scraper"
 	"golang.org/x/oauth2/google"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 )
 
@@ -21,6 +23,7 @@ func HandleRequest(ctx context.Context, name MyEvent) (string, error) {
 }
 
 func main() {
+	scrape(context.Background())
 	lambda.Start(HandleRequest)
 }
 
@@ -46,13 +49,20 @@ func scrape(ctx context.Context) (string, error) {
 		scraper.FamilyMartScraper{},
 		scraper.SevenElevenScraper{}}
 
-	for _, scraper := range scrapers {
-		ref := client.NewRef(scraper.DatabasePath())
-		items := scraper.Scrape()
+	eg := errgroup.Group{}
 
-		if error := ref.Set(ctx, items); error != nil {
-			return "database set error", error
-		}
+	for _, s := range scrapers {
+		scraper := s
+		eg.Go(func() error {
+			ref := client.NewRef(scraper.DatabasePath())
+			items := scraper.Scrape()
+			return ref.Set(ctx, items)
+		})
+	}
+
+	if error := eg.Wait(); error != nil {
+		log.Fatal(error)
+		return "error", error
 	}
 
 	return "success", nil

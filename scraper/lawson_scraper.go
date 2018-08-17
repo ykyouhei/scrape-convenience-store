@@ -33,7 +33,7 @@ func (scraper LawsonScraper) DatabasePath() string {
 
 // Scrape サイトをスクレイピングして商品リストを返す
 func (scraper LawsonScraper) Scrape() map[string]interface{} {
-	log.Println("=============== [START] FamilyMartScraper ==============")
+	log.Println("=============== [START] LawsonScraper ==============")
 
 	const (
 		baseURL  = "http://www.lawson.co.jp"
@@ -71,7 +71,7 @@ func (scraper LawsonScraper) Scrape() map[string]interface{} {
 
 		items[item.ID] = item
 
-		log.Printf("%s: %s\n", item.ID, itemName)
+		log.Printf("[L]%s: %s\n", item.ID, itemName)
 	})
 
 	return items

@@ -66,7 +66,7 @@ func (scraper FamilyMartScraper) Scrape() map[string]interface{} {
 
 		items[item.ID] = item
 
-		log.Printf("%s: %s\n", item.ID, itemName)
+		log.Printf("[F]%s: %s\n", item.ID, itemName)
 	})
 
 	return items

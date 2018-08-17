@@ -88,7 +88,7 @@ func (scraper SevenElevenScraper) Scrape() map[string]interface{} {
 
 			items = update(items, item, area)
 
-			log.Printf("%s: %s\n", item.ID, itemName)
+			log.Printf("[S]%s: %s\n", item.ID, itemName)
 		})
 	}
 
