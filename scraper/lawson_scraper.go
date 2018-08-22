@@ -56,7 +56,7 @@ func (scraper LawsonScraper) Scrape() map[string]interface{} {
 		itemID := extractID(detailURL)
 
 		detailDoc, _ := htmlquery.LoadURL(detailURL)
-		imgURL := htmlquery.SelectAttr(htmlquery.FindOne(detailDoc, "//p[@class='img']//img"), "src")
+		imgURL := htmlquery.SelectAttr(htmlquery.FindOne(detailDoc, "//div[@class='leftBlock']/p[@class='mb05']/img"), "src")
 		text := htmlquery.InnerText(htmlquery.FindOne(detailDoc, "//div[@class='rightBlock']/p[@class='text']"))
 
 		item := LawsonItem{
