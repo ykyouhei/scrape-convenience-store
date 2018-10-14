@@ -62,18 +62,16 @@ func (scraper SevenElevenScraper) Scrape() map[string]interface{} {
 		area := areas[htmlquery.InnerText(areaNode.FirstChild)]
 
 		htmlquery.FindEach(itemListNodes[index], "li[@class='item']", func(index int, itemNode *html.Node) {
-			imgNode := htmlquery.FindOne(itemNode, "div[@class='image']")
 			summryNode := htmlquery.FindOne(itemNode, "div[@class='summary']")
 			itemNameNode := htmlquery.FindOne(summryNode, "div[@class='itemName']")
 			itemPriceNode := htmlquery.FindOne(summryNode, "ul[@class='itemPrice']")
 
-			imgURL := htmlquery.SelectAttr(htmlquery.FindOne(imgNode, "//img"), "src")
 			itemName := htmlquery.InnerText(htmlquery.FindOne(itemNameNode, "//a"))
 			detailURL := baseURL + htmlquery.SelectAttr(htmlquery.FindOne(itemNameNode, "//a"), "href")
 			id := extractItemID(detailURL)
 			launchTime := launchTime(htmlquery.InnerText(htmlquery.FindOne(itemPriceNode, "li[@class='launch']")), newJPSeparator())
 			taxExcluded, taxIncluded := extractPrices(htmlquery.InnerText(htmlquery.FindOne(itemPriceNode, "li[@class='price']")))
-			detailText := loadDetailText(detailURL)
+			detailText, imgURL := loadDetailTextAndImageURL(detailURL)
 
 			item := SevenElevenItem{
 				id,
@@ -120,10 +118,15 @@ func update(items []SevenElevenItem, item SevenElevenItem, area int) []SevenElev
 	return append(newItems, item)
 }
 
-func loadDetailText(detailURL string) string {
+func loadDetailTextAndImageURL(detailURL string) (detailText, imageURL string) {
 	doc, _ := htmlquery.LoadURL(detailURL)
 	textNode := htmlquery.FindOne(doc, "//div[@class='text']")
-	return htmlquery.InnerText(textNode)
+	imgNode := htmlquery.FindOne(doc, "//div[@class='image']")
+
+	a := htmlquery.InnerText(textNode)
+	b := htmlquery.SelectAttr(htmlquery.FindOne(imgNode, "//img"), "src")
+
+	return a, b
 }
 
 func extractItemID(detailURL string) (id string) {
