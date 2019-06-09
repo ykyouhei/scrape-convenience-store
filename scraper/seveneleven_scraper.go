@@ -126,7 +126,7 @@ func loadDetailTextAndImageURL(detailURL string) (detailText, imageURL string) {
 	a := htmlquery.InnerText(textNode)
 	b := htmlquery.SelectAttr(htmlquery.FindOne(imgNode, "//img"), "src")
 
-	return a, b
+	return a, "https:" + b
 }
 
 func extractItemID(detailURL string) (id string) {
